@@ -1,0 +1,121 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+    <!-- Required meta tags -->
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+
+    <title>Hello, world!</title>
+</head>
+<body>
+
+<div class="container mt-5">
+    <div class="row justify-content-center" id="nicknameSection">
+        <div class="col-lg-4">
+            <div class="form-group mb-3">
+                <input class="form-control" id="nickname" placeholder="Enter a nickname..."/>
+            </div>
+            <button type="button" onclick="setNickname()" class="btn btn-success">Set Nickane</button>
+        </div>
+    </div>
+    <div class="row" id="channelSection" style="display:none">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-body">
+                    <div id="inbox"></div>
+                </div>
+                <div class="card-footer text-muted">
+                    <div class="input-group mb-3">
+                        <input type="text" class="form-control" placeholder="Message..." id="message">
+                        <div class="input-group-append" id="sendButton" onclick="send()">
+                            <span class="input-group-text">Send</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-4">
+            <ul class="list-group" id="channels"></ul>
+        </div>
+    </div>
+</div>
+<!-- Optional JavaScript -->
+<!-- jQuery first, then Popper.js, then Bootstrap JS -->
+<script src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js" integrity="sha384-UO2eT0CpHqdSJQ6hJty5KVphtPhzWj9WO1clHTMGa3JDZwrnQq4sF86dIHNDz0W1" crossorigin="anonymous"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM" crossorigin="anonymous"></script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/3.1.7/signalr.min.js"></script>
+
+<script>
+    var nickname = "";
+    var channelId = 0;
+    $(document).ready(function (){
+        $.ajax("@Url.Action("ChannelList")")
+            .done(function (data){
+                var el = $("#channels");
+                el.html(null);
+                $.each(data, function (index,item){
+                    el.append('<li class="list-group-item" onclick="setChannel(\''+item.Id+'\')">' + item.Name + '</li>')
+                });
+            });
+        
+        $("#message").keypress(function (e){
+            if (e.keyCode === 13){
+                send();
+            }
+        });
+    })
+    
+    
+    function send(){
+        if (channelId === 0 || channelId === null) {
+            alert("please select a channel");
+            return;
+        }
+        var message = $("#message").val();
+        $.post({
+            url: "@Url.Action("SendMessage")",
+            data: { Text: message, SenderNickname: nickname, ChannelId: channelId }
+        }).done(function (data){
+            $("#message").val(null);
+        });
+    }
+    var connection;
+    function setChannel(id){
+        $("#inbox").html(null);
+        if (connection){
+            connection.stop();
+            connection = null;
+        }
+        connection = new signalR.HubConnectionBuilder()
+                   .withUrl("/channelHub?channelId=" + id)
+                   .build();
+        connection.start();
+        connection.on("ReceiveMessage", (message) =>{
+            console.log(message);
+            var html = '' +
+                '<div class="d-flex text-muted pt-3">'+
+                '   <p class="pb-3 mb-0 small lh-sm border-bottom"><strong class="d-block text-gray-dark">'+message.senderNickName+'</strong>'+
+                message.text+'</p></div>';
+            
+            $("#inbox").append(html)
+        })
+        this.channelId = id;
+    }
+    
+    function setNickname(){
+        this.nickname = $("#nickname").val();
+        $("#nicknameSection").hide();
+        $("#channelSection").show();
+    }
+</script>
+<style>
+    #inbox { height: 550px; overflow-y: scroll;}
+    #sendButton:hover, .list-group-item:hover{ cursor: pointer;}
+  </style>
+</body>
+</html>
